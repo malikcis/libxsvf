@@ -372,22 +372,35 @@ int libxsvf_svf(struct libxsvf_host *h)
 			goto eol_check;
 		}
 
-		if (!strtokencmp(p, "FREQUENCY")) {
+				if (!strtokencmp(p, "FREQUENCY")) {
 			unsigned long number = 0;
+			int got_decimal_point = 0;
+			int decimal_digits = 0;
 			int exp = 0;
 			p += strtokenskip(p);
 			if (*p < '0' || *p > '9')
 				goto syntax_error;
-			while (*p >= '0' && *p <= '9') {
-				number = number*10 + (*p - '0');
+			while ((*p >= '0' && *p <= '9') || (*p == '.')) {
+				if (*p == '.') {
+					got_decimal_point = 1;
+				} else {
+					if (got_decimal_point)
+						decimal_digits++;
+					number = number*10 + (*p - '0');
+				}
 				p++;
 			}
 			if(*p == 'E' || *p == 'e') {
 				p++;
+				if (*p == '+')
+					p++;
 				while (*p >= '0' && *p <= '9') {
 					exp = exp*10 + (*p - '0');
 					p++;
 				}
+				exp -= decimal_digits;
+				if (exp < 0)
+					goto syntax_error;
 				for(i=0; i<exp; i++)
 					number *= 10;
 			}
@@ -422,7 +435,7 @@ int libxsvf_svf(struct libxsvf_host *h)
 			goto unsupported_error;
 		}
 
-		if (!strtokencmp(p, "RUNTEST")) {
+		if (!strtokencmp(p, "RUNTEST")) {//updated for lattice flash programming by Malik Cisse
 			p += strtokenskip(p);
 			int tck_count = -1;
 			int sck_count = -1;
@@ -453,8 +466,17 @@ int libxsvf_svf(struct libxsvf_host *h)
 				int number = 0;
 				int exp = 0, expsign = 1;
 				int number_e6, exp_e6;
-				while (*p >= '0' && *p <= '9') {
-					number = number*10 + (*p - '0');
+				int got_decimal_point = 0;	
+				int decimal_digits = 0;			
+				while ((*p >= '0' && *p <= '9') || (*p == '.')) {
+					if (*p == '.') {
+						got_decimal_point = 1;
+					} 
+					else {
+						if (got_decimal_point)						
+							decimal_digits++;
+						number = number*10 + (*p - '0');
+					}
 					p++;
 				}
 				if(*p == 'E' || *p == 'e') {
@@ -463,11 +485,16 @@ int libxsvf_svf(struct libxsvf_host *h)
 						expsign = -1;
 						p++;
 					}
+					if(*p == '+') {
+						expsign = 1;
+						p++;
+					}
 					while (*p >= '0' && *p <= '9') {
 						exp = exp*10 + (*p - '0');
 						p++;
 					}
 					exp = exp * expsign;
+					exp -= decimal_digits;
 					number_e6 = number;
 					exp_e6 = exp + 6;
 					while (exp < 0) {
